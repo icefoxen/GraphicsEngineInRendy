@@ -1,0 +1,6 @@
+[book]
+authors = ["Simon Heath"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Making A Graphics Engine In Rendy"
