@@ -1,5 +1,12 @@
-# Background
+This is a guide for how to write a simple graphics system in Rust, using `rendy` and `gfx-hal`.
 
+This guide is up to date as of September 2019, and uses `rendy` 0.3 and `gfx-hal` 0.3.  We also use `winit` 0.19 for windowing.  This is NOT a tutorial for learning `gfx-hal` or Vulkan, it assumes you hae at least written some basic Vulkan programs.  It also assumes you are reasonably familiar with the Rust programming language.  If this is not the case, here are some useful resources:
+
+ * Vulkan tutorial
+ * Rust book
+ * Rust nomicon
+
+# Background
 
 `gfx-hal` is a low-level platform-independent graphics library written in Rust.  Its goal is for you to be able to write graphics code once and have it function the same on any platform: Windows, Linux, MacOS, mobile, whatever.  To do this it offers several "backends" that translate its own API to whatever graphics API is native to the platform.  On Windows it can use DirectX 12, Vulkan or OpenGL, on MacOS it uses OpenGL or Metal, and so on.  It is designed to be high-performance and unopinionated, so it is quite low-level; in fact, it is deliberately designed to essentially mimic (a Rust-ified version of) the Vulkan graphics standard.  The idea is that you can basically just write code that draws things with Vulkan, and it will run anywhere regardless of whether the platform natively implements Vulkan or not.
 
@@ -20,16 +27,43 @@ And so on.  `rendy` is still under development but it functions very well alread
 # Disclaimers
 
  * `gfx-hal` is not *quite* identical to Vulkan.  TODO: Fill in details here.
- * `rendy` does not *quite* work perfectly on all backends yet.  TODO: Fill in details here.
+ * `rendy` does not *quite* work perfectly on all backends.  TODO: Fill in details here.
  * `gfx-hal` and `rendy` are unsafe API's.  It is up to you to make safe code atop them, or not, as you see fit.  This is just due to the nature of Vulkan, which does essentially no run-time checking by default, and the decision fo `gfx-hal` to not add any overhead to that.  However it's mostly pretty easy and straightforward unsafe code; there's lots of array index arithmatic and manual resource management, but not a lot of complicated pointer shenanigans or lurking synchronization sharks.  We will be doing our best to add safety where feasible.
 
 So, let's get to it!
 
+# Application structure
 
-## What is Vulkan?
+We are going to start with a high-level explaination and then get down to the specifics, ending up in actual code for a small rendering engine.
 
-## What is `gfx-hal`?
+TODO: Then, if we have time, we are going to go back up from our code 
 
-## What is `rendy`?
+TODO: Double-check ALL of this!
 
-## How do we put it all together?
+At the high level, a Vulkan application is made of a few main parts:
+
+ * Window -- Your handle to talk to the OS about graphics and event stuff.
+ * Device and instance -- Your handles to talk to the GPU(s).
+ * Shaders -- A program that you write that processes data to control what is actually displayed.
+ * Various data buffers such as textures, vertex buffers, and so on -- Inputs to shader programs.
+ * Queue -- A queue in which commands are recorded to tell the graphics card what and how to actually draw. TODO: Command pools, buffers, etc; how does that work?
+ * Render pass (and subpasses) -- A single step in rendering that runs asynchronously, accepting some inputs and producing some outputs.  I think of it as like a function.
+ * Pipeline -- The whole shebang that ties together how to sequence render passes, what their inputs and outputs are, and what shaders they use.  Essentially a blueprint for the entire rendering process.
+ * Swapchain -- The structure that controls when your rendered frame is displayed to the screen.
+
+So, once you have a window, device and instance, you define a pipeline that says how to draw to the screen.  This pipeline contains one or more render passes which ulimately produce a rendered raster image, and a set of shaders that that consumes the data it's given and produces the type of output it needs to.  Each render pass binds data to some shaders and records drawing commands in one or more queue's.  And then the swapchain organizes one or more pipelines running in parallel and controls the timing of when to physically send the results to the monitor, implementing double buffering, triple buffering or whatever else you tell it to do.
+
+The parts that Rendy offers tools to simplify:
+
+ * Window, device and instance creation
+ * Swapchain management
+ * Render pass sequencing
+ * Buffer creation/data transfer
+
+## The Graph
+
+A lot of the tools `rendy` provides come together in the `Graph`.  This is, as the name implies, a set of nodes connected by edges... where each node is a render pass, and each edge is data going from one render pass to the next.  It must (TODO: Double-check!) terminate in a single `PresentNode`, which represents the final rendered image being shown on your screen.  The `Graph` does several jobs, all of which comes down to defining and controlling the flow of data through render passes.
+
+TODO: Cycles?  Or must it be a DAG?
+
+The `PresentNode` is also in charge of handling the swapchain.
