@@ -1,0 +1,16 @@
+[package]
+name = "rendy_examples"
+version = "0.1.0"
+authors = ["Simon Heath <icefox@dreamquest.io>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = "0.4"
+env_logger = "0.6"
+
+gfx-hal = "0.3"
+gfx-backend-vulkan = "0.3"
+rendy = {version = "0.4", features = ["base", "vulkan"]}
+#winit = {version = "0.20.0-alpha3"}
