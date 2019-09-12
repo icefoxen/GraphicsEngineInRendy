@@ -7,7 +7,7 @@ use rendy::{self, command, factory, graph};
 type Backend = rendy::vulkan::Backend;
 
 fn run(
-    event_loop: EventsLoop,
+    mut event_loop: EventsLoop,
     mut factory: factory::Factory<Backend>,
     mut families: command::Families<Backend>,
     graph: graph::Graph<Backend, ()>,
