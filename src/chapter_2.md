@@ -3,7 +3,7 @@
 
 We are going to start with a high-level explaination and then get down to the specifics, ending up in actual code for a small rendering engine.
 
-TODO: Then, if we have time, we are going to go back up from our code 
+TODO: Then, if we have time, we are going to go back up from our code
 
 TODO: Double-check ALL of this!
 
@@ -65,9 +65,31 @@ Buffers, instances, render targets, pipelines, shaders, instances...
         current_frame (just starts at 0)
 
 
+So the Vulkan drawing model has a few main parts, with ten million
+subparts:
+
+Pipeline -- Describes how everything goes together into being able to
+run a draw call.  Describes how shaders are connected to their inputs,
+as well (via descriptor sets)
+Command buffer/queue -- Describes the actual drawing operations that occur
+Pass (with subpasses) -- Describes how to connect together things that
+render until they eventually produce a single frame
+Swapchain -- Describes how to sequence the rendering of multiple
+frames
+
+
 ## `gfx-hal` differences from Vulkan
 
 People WILL always ask this, so we should write it down.
+
+ * Iterators instead of using only slices
+ * Non-Copy handles instead of Vulkan's integer handles -- makes borrowing and thread-safety easier to reason about
+ * Omits some minor features (like triangle fans) that are [harder to make portable(https://www.khronos.org/vulkan/portability-initiative)
+ * Omits a buggy feature or two
+
+Authoratative source here:
+<https://github.com/gfx-rs/gfx/wiki/Deviations-from-Vulkan>
+
 
 ## Rendy's drawing model
 
