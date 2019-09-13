@@ -156,7 +156,7 @@ description of the command queues that the device supports.
 
 So, let's carry on:
 
-```
+```rust
 let surface = factory.create_surface(&window);
 
 let graph_builder = graph::GraphBuilder::<Backend, ()>::new();
