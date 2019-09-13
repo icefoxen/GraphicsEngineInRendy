@@ -128,7 +128,7 @@ feature flags and `#[cfg()]` statements.
 
 Great, but now what do we actually do with this?  `rendy` has three main
 top-level types: the `Factory`, the command queue `Families`, and the
-frame `Graph`.  Unlike doing setup with just bare Vulkan, `rendy` will
+frame `Graph`.  Unlike using just bare Vulkan, `rendy` will
 happily give us sensible defaults, so creating these are pretty simple.
 
 ```rust
@@ -140,7 +140,7 @@ let (mut factory, mut families):
 
 The `Config` object lets us choose things like what graphics device we
 are using, what memory to use for our memory allocation, and all that
-jazz.  But it gives us pretty reasonable defaults, so I've yet to need
+jazz.  But it gives us pretty good defaults, so I've yet to need
 to actually mess with it.
 
 We just pass the `Config` to the `factory::init()` method and it creates
@@ -150,7 +150,7 @@ explicitly tell it what the types are and it Just Does The Right Thing
 to initialize the correct backend.  The `Factory` is something we will
 see a lot, it is the core structure that `rendy` uses to create and
 destroy resources like images and buffers.  It contains the
-`gfx-hal`/Vulkan `Instance` and `Device` types, as well as a bunch of
+`gfx-hal`/Vulkan `Instance` and `Device` objects, as well as a bunch of
 other stuff.  `Families` gets used less often, it is mainly a
 description of the command queues that the device supports.
 
@@ -174,7 +174,7 @@ final render target that gets displayed on the screen, and we create a
 to our `run()` function.  We don't even use the `surface` yet, that will
 come in a moment.  You see that we specify two types for our
 `graph_builder`, the first is our `Backend` type, and the second is just
-`()`.  The second type is there for you to store auxiliary data in that
+`()`.  The second type is there for you to store auxiliary data that
 gets owned by the `Graph` and shared between graphics pipelines, and is often just called `aux` in
 the API.  We don't need it right now, so we just use `()`; you can see
 that we provide the initial value for it in the last argument of
@@ -223,18 +223,20 @@ sleep and waking back up perhaps), then we're going to have to destroy
 the old `Graph` and create a new one.  You can see the disposal
 happening in the `WindowEvent::CloseRequested` match arm.
 
-This is another key pattern: `Graph::dispose()` takes a reference to our
+This is another key pattern: `Graph::dispose()` destroys our `Graph`,
+but calling it takes a reference to our
 `Factory`.  Like `gfx-hal`, most types in `rendy` take some amount of
 manual memory management!  Vulkan requires that each resource is
 destroyed by the `Instance` that created it, since the resource is
 usually representing a chunk of memory or something on a specific GPU,
 and the `Instance` describes that relationship.
 On multi-GPU systems, it's really not very helpful for GPU 1 to try to
-manage GPU 2's memory!  Since we need a reference to the correct
+allocate or free GPU 2's memory!  Since we need a reference to the correct
 `Factory` to destroy an object, the objects can't just implement `Drop`.
 Well, they could, but it would involve either a global `Factory` or
 every single object created by a `Factory` to hold an `Rc` to it,
-neither of those solutions are really desirable either.
+neither of those solutions are really desirable either.  So, we are
+forced to take care of it by hand.
 
 `rendy` does help us out to make life easier though.  The `Graph` is
 designed to make it easy to create and destroy related objects in chunks
@@ -248,11 +250,12 @@ create a thing from the `Factory` itself or from a method taking
 somewhere.
 
 Anyway!  You should be able to run this code and you will get... STILL
-an empty window with nothing drawn in it!  Huzzah!
+an empty window with nothing drawn in it.  Progress!
 
 ## Render groups and the `Graph`
 
-Okay, let's get set up to actually draw something.  This is what the
+Okay, let's get set up to actually do something, even if it's just
+clearing the screen.  This is what the
 `Graph` is for.  It implements a system called a "frame graph", which
 is almost but not quite entirely unlike a "scene graph" you may have
 encountered as a method for representing objects in a scene.  A frame
@@ -262,23 +265,27 @@ order in which they are drawn.
 So, some review.  A "render target" is a buffer of pixels (more or less)
 that a scene gets rendered to; what gets shown in your actual window is
 a render target.  But you can also have render targets that don't get
-displayed to the screen, but are inputs to other drawing steps.  For
-a simple example you may create a scene with shadows by first rendering the
+displayed to the screen, but are inputs to other drawing steps.
+For a simple example, you might implement a mirror in a game by drawing
+a scene from one angle, then using the render target as a texture and
+applying that texture to the mirror quad when you draw the scene from
+a different angle.
+A more complicated example might be making dynamic shadows: first rendering the
 scene, then for each light in the scene rendering its shadow map to a
-different render target, combining all the shadow maps into a single
-one, then finally using the information in all the
+different render target, then finally using the information in all the
 shadow maps to draw shadows on top of the original scene.  This process
 involves several steps rendering to different render targets, some of
 which can be run in parallel with each other and some of which can't.
 This is the process that the frame graph coordinates.
 
 A `Graph` contains zero or more node's.  Each node is
-essentially a function that takes a set of inputs
+essentially a structure with a couple methods that takes a set of inputs
 (`Buffer`'s and `Image`'s) and does stuff with them (generally drawing
 something or calculating some data).  Further, each node can say
-that it depends on other nodes to execute before it,
+that it depends on other nodes to execute before it, and what inputs
+it depends on.
 
-Like memory allocation, it IS up to you to get this right.  If you
+Like memory allocation, it is up to you to get this right.  If you
 make one node write to a buffer and another one read from the same
 buffer, and don't specify the dependency between them correctly,
 `rendy` can't tell you that you have a data race and force you
@@ -287,7 +294,7 @@ like memory allocation, `rendy` does its best to make it easier,
 by letting you organize all the resources and node dependencies
 in one place.  More importantly, once you DO get it organized
 properly, `rendy` **takes care of the synchronization and ordering
-for you**.  You generally don't have to touch semaphores or fences
+for you**.  You generally don't have to touch Vulkan's semaphores or fences
 when drawing with `rendy`, it figures it out on its own based
 on the information you've given it in the `Graph`.
 Even better, it handles the swapchain for you; the whole laborious
@@ -303,7 +310,9 @@ The first is our actual renderer node that does stuff (it is
 actually one stage in a render pass, but we will get to that
 later), and the `Desc` (short for "Descriptor") is a structure
 that describes all the inputs and outputs of your `RenderGroup`
-and for actually creating it.
+and for actually creating it.  This is much like the description
+objects that Vulkan uses to, essentially, represent dynamic type 
+information for buffers or pipelines.  
 
 So once all that gets sorted out, actually implementing these traits
 is pretty simple.  Our `ClearGroup` has to implement three methods:
@@ -343,8 +352,8 @@ impl RenderGroup<Backend, ()> for ClearGroup {
 }
 ```
 
-You see that `prepare()` returns a `PrepareResult`.  The options are
-`DrawRecord` and `DrawReuse`.  This lets `rendy` essentially cache
+You see that `prepare()` returns a `PrepareResult`, which may be
+`DrawRecord` or `DrawReuse`.  This lets `rendy` essentially cache
 drawing commands when possible; if none of the data your `RenderGroup`
 is drawing has changed, it can just reuse the previous draw calls.
 
@@ -381,14 +390,16 @@ impl RenderGroupDesc<Backend, ()> for ClearGroupDesc {
 }
 ```
 
-You see that it has the `build()` method that actually creates a
+Note that it is the `build()` method that actually creates a
 `ClearGroup` for us.  That's the only thing that `RenderGroupDesc`
-*requires* you to implement, but there's many other methods on it
+*requires* you to implement, but there's several other methods on it
 that you probably want to override, because they describe the shared
 buffers and images that the corresponding `RenderGroup` actually uses,
 as well as things like color and depth buffer information.  You can see
 here that we've overridden `depth()` to return false, since we're not
-using a depth buffer in this program yet.
+using a depth buffer in this program yet.  Getting these wrong often
+gives you a failed debug assertion at runtime, but it's best not to
+rely on them.
 
 ## Actually clearing the screen
 
@@ -426,7 +437,7 @@ graph_builder.add_node(
 );
 ```
 
-We'll go through these one step at a time:
+We'll go through this one step at a time:
 
  * First we create a `RenderPassNodeBuilder`
  * We add a subpass to it by creating a `SubpassBuilder`
@@ -437,7 +448,7 @@ We'll go through these one step at a time:
    to the `SubpassBuilder`.
  * We call `.with_color_surface()` on our `SubpassBuilder` to tell it
    that we want a color attachment involved.
- * We are done creating our subpass, so now we call `.with_surface()` on
+ * We are done creating our subpass, so next we call `.with_surface()` on
    our `RenderPassNodeBuilder`.  This gets given the `surface`
    corresponding to the window's render target we made way back when we
    created the `Factory`...
