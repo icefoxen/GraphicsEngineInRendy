@@ -56,6 +56,10 @@ impl RenderGroupDesc<Backend, ()> for ClearGroupDesc {
     ) -> Result<Box<dyn RenderGroup<Backend, ()> + 'static>, Error> {
         Ok(Box::new(ClearGroup))
     }
+
+    fn depth(&self) -> bool {
+        false
+    }
 }
 
 fn run(
@@ -70,7 +74,13 @@ fn run(
         Event::WindowEvent {
             event: WindowEvent::CloseRequested,
             ..
-        } => ControlFlow::Break,
+        } => {
+            if let Some(g) = graph.take() {
+                g.dispose(&mut factory, &());
+            }
+            ControlFlow::Break
+        }
+
         Event::WindowEvent {
             event: WindowEvent::Refresh,
             ..
@@ -88,7 +98,7 @@ fn run(
 
 fn main() {
     env_logger::Builder::from_default_env()
-        .filter_module("03_hello_triangle", log::LevelFilter::Trace)
+        .filter_module("03_clear", log::LevelFilter::Trace)
         .init();
 
     let config: factory::Config = Default::default();
