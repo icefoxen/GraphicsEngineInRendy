@@ -1,3 +1,5 @@
 book
 *~
 **/*~
+code/Cargo.lock
+code/target/
