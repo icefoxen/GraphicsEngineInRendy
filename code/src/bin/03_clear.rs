@@ -102,7 +102,7 @@ fn main() {
         .init();
 
     let config: factory::Config = Default::default();
-    let (mut factory, mut families): (factory::Factory<Backend>, _) =
+    let (mut factory, mut families): (factory::Factory<Backend>, command::Families<Backend>) =
         factory::init(config).expect("Could not init Rendy context");
 
     let event_loop = EventsLoop::new();
@@ -117,10 +117,12 @@ fn main() {
     let mut graph_builder = graph::GraphBuilder::<Backend, ()>::new();
 
     graph_builder.add_node(
-        graph::render::SubpassBuilder::new()
-            .with_color_surface()
-            .with_group(ClearGroupDesc::default().builder())
-            .into_pass()
+        graph::render::RenderPassNodeBuilder::new()
+            .with_subpass(
+                graph::render::SubpassBuilder::new()
+                    .with_group(ClearGroupDesc::default().builder())
+                    .with_color_surface(),
+            )
             .with_surface(
                 surface,
                 Some(hal::command::ClearValue::Color(
