@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 log = "0.4"
 env_logger = "0.6"
+failure = "0.1"
 
 gfx-hal = "0.3"
 gfx-backend-vulkan = {version = "0.3", features = ["x11"]}
